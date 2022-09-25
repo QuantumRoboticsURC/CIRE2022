@@ -5,13 +5,14 @@ from simple_pid import PID
 import csv
 import rospy
 import time
-from std_msgs.msg import String, Int32
+from std_msgs.msg import String, Int32, Bool
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from sensor_msgs.msg import NavSatFix
 from geometry_msgs.msg import PoseStamped
 import sys
+
 
 pid_x = PID(1, 0, 0.0)
 pid_x.output_limits = (-0.3, 0.3)
@@ -36,7 +37,7 @@ hsrb_theta_pos = 0
 goal_theta_pos = 0
 
 def callback_position(data):
-    global hsrb_theta_pos, goal_theta_pos, hsrb_x_pos, hsrb_y_pos, goal_x_pos, goal_y_pos, row, roll, pitch, yaw, target_angle, hsrb_angle, distance, row, error # Se agrego ROW
+    global hsrb_theta_pos, goal_theta_pos, hsrb_x_pos, hsrb_y_pos, goal_x_pos, goal_y_pos, row, roll, pitch, yaw, target_angle, hsrb_angle, distance, rows, error # Se agrego ROW
     file = open("/home/shikur/CIRE2022/catkin_ws/src/stage03/scripts/csv_files/stage03.csv")
     csvreader = csv.reader(file)
     # header = next(csvreader)
@@ -80,12 +81,20 @@ def callback_position(data):
     #goal_pub.longitude = longitude
     #goal_position_publisher.publish(goal_pub)
 
+def callback_waypoint(data):
+    global rows, row
+
+    if (data):
+        print("Siguiente checkpoint")
+        row+=1
+        time.sleep(0.1)
 #command = Twist()
 
 def main():    
-    global distance, error, target_angle, hsrb_angle, row, goal_x_pos, goal_y_pos, hsrb_x_pos, hsrb_y_pos, goal_theta_pos
+    global distance, error, target_angle, hsrb_angle, row, goal_x_pos, goal_y_pos, hsrb_x_pos, hsrb_y_pos, goal_theta_pos, row, rows
     rospy.init_node('navigation_ok', anonymous=True)
     rospy.Subscriber("/global_pose", PoseStamped, callback_position)
+    rospy.Subscriber("/stage03/waypoint", Bool, callback_waypoint)
     pub = rospy.Publisher('/hsrb/command_velocity', Twist, queue_size=0)
     command = Twist()
 
@@ -133,22 +142,21 @@ def main():
         command.linear.y = -output_y
         command.angular.z = -output_theta
         
-        print ("ERror de angulo: ", error)
+        print ("Error de angulo: ", error)
 
-        
         if (distance < 0.1 and distance > 0):
             command.linear.x = 0
             command.linear.y = 0
             if (abs(error) < 2):
-                if (row == 0): #Avoid
+                if (rows[row][0]) == "PASS": #Avoid
                     print("Siguiente checkpoint")
                     row += 1
                     time.sleep(0.1)
-                else:
-                    print("Siguiente checkpoint")
-                    time.sleep(5)
-                    row += 1
-                    time.sleep(0.1)
+            #    else:
+            #        print("Siguiente checkpoint")
+            #        time.sleep(5)
+            #        row += 1
+            #        time.sleep(0.1)
 
         # else:
         #     if abs(error) > 180:
